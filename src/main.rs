@@ -1,6 +1,9 @@
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
+use bevy_inspector_egui::inspector_options::std_options::NumberDisplay;
+use bevy_inspector_egui::InspectorOptions;
+use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use bevy_inspector_egui::quick::{ResourceInspectorPlugin, WorldInspectorPlugin};
 use bevy_window_title_diagnostics::WindowTitleLoggerDiagnosticsPlugin;
 
@@ -9,13 +12,17 @@ const PARTICLE_SIZE: f32 = 20.;
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
-        .insert_resource(Gravity { val: 10. })
+        .insert_resource(Gravity { val: 250. })
         .insert_resource(BoundsSize::default())
+        .insert_resource(CollisionDamping::default())
         .register_type::<Gravity>()
         .register_type::<BoundsSize>()
+        .register_type::<CollisionDamping>()
         .add_plugins(DefaultPlugins)
         .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(ResourceInspectorPlugin::<Gravity>::default())
+        .add_plugins(ResourceInspectorPlugin::<BoundsSize>::default())
+        .add_plugins(ResourceInspectorPlugin::<CollisionDamping>::default())
         .add_plugins(WindowTitleLoggerDiagnosticsPlugin {
             // It is possible to filter Diagnostics same way as default LogDiagnosticsPlugin
             // filter: Some(vec![FrameTimeDiagnosticsPlugin::FPS]),
@@ -33,6 +40,19 @@ struct Gravity {
     val: f32,
 }
 
+#[derive(Reflect, Resource, Deref, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
+struct CollisionDamping {
+    #[inspector(min = 0.0, max = 1., speed = 0.05, display = NumberDisplay::Slider)]
+    val: f32,
+}
+
+impl Default for CollisionDamping {
+    fn default() -> Self {
+        Self { val: 1.0 }
+    }
+}
+
 #[derive(Reflect, Resource, Deref)]
 #[reflect(Resource)]
 struct BoundsSize {
@@ -41,7 +61,7 @@ struct BoundsSize {
 
 impl Default for BoundsSize {
     fn default() -> Self {
-        Self { size: Vec2::new(200., 300.) }
+        Self { size: Vec2::new(600., 400.) }
     }
 }
 
@@ -57,12 +77,9 @@ fn spawn_camera(mut commands: Commands) {
 
 fn spawn_basic_scene(
     mut commands: Commands,
-    mut config: ResMut<GizmoConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    config.line_width = 15.;
-
     // Circle
     commands.spawn((
         MaterialMesh2dBundle {
@@ -109,18 +126,19 @@ fn update_position(
 
 fn resolve_collision(
     bounds_size: Res<BoundsSize>,
-    mut query: Query<(&Transform, &mut Velocity, With<WaterAtom>)>,
+    collision_damping: Res<CollisionDamping>,
+    mut query: Query<(&mut Transform, &mut Velocity, With<WaterAtom>)>,
 ) {
-    let half_bounds_size = bounds_size.size * 0.5  - Vec2::ONE * PARTICLE_SIZE;
+    let half_bounds_size = bounds_size.size * 0.5 - Vec2::ONE * PARTICLE_SIZE;
 
-    for (transform, mut velocity, _) in query.iter_mut() {
+    for (mut transform, mut velocity, _) in query.iter_mut() {
         if transform.translation.x.abs() > half_bounds_size.x {
-            // should I update translation?
-            // transform.translation.x = half_bounds_size.x * transform.translation.x.signum(); 
-            velocity.x *= -1.;
+            transform.translation.x = half_bounds_size.x * transform.translation.x.signum();
+            velocity.x *= -1. * collision_damping.val;
         }
         if transform.translation.y.abs() > half_bounds_size.y {
-            velocity.y *= -1.;
+            transform.translation.y = half_bounds_size.y * transform.translation.y.signum();
+            velocity.y *= -1. * collision_damping.val;
         }
     }
 }
