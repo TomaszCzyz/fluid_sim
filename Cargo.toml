@@ -13,3 +13,4 @@ opt-level = 3
 bevy = "0.11.3"
 mac = "*"
 bevy-inspector-egui = "0.20.0"
+bevy_window_title_diagnostics = "0.5"

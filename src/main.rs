@@ -1,16 +1,23 @@
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_inspector_egui::quick::{ResourceInspectorPlugin, WorldInspectorPlugin};
+use bevy_window_title_diagnostics::WindowTitleLoggerDiagnosticsPlugin;
 
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
-        .insert_resource(Gravity { val: 2. })
-        .register_type::<Gravity>() // you need to register your type to display it
+        .insert_resource(Gravity { val: 10. })
+        .register_type::<Gravity>()
         .add_plugins(DefaultPlugins)
         .add_plugins(WorldInspectorPlugin::new())
-        // .add_plugins(FrameTimeDiagnosticsPlugin::default())
-        // .add_plugins(EntityCountDiagnosticsPlugin::default())
+        .add_plugins(ResourceInspectorPlugin::<Gravity>::default())
+        .add_plugins(WindowTitleLoggerDiagnosticsPlugin {
+            // It is possible to filter Diagnostics same way as default LogDiagnosticsPlugin
+            // filter: Some(vec![FrameTimeDiagnosticsPlugin::FPS]),
+            ..Default::default()
+        })
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_systems(Startup, (spawn_camera, spawn_basic_scene))
         .add_systems(Update, (apply_gravity, update_position))
         .run();
