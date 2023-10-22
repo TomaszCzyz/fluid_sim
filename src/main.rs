@@ -1,12 +1,14 @@
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.2, 0.2, 0.2)))
-        .insert_resource(Gravity { val: 10. })
+        .insert_resource(Gravity { val: 2. })
+        .register_type::<Gravity>() // you need to register your type to display it
         .add_plugins(DefaultPlugins)
-        // .add_plugins(WorldInspectorPlugin::new())
+        .add_plugins(WorldInspectorPlugin::new())
         // .add_plugins(FrameTimeDiagnosticsPlugin::default())
         // .add_plugins(EntityCountDiagnosticsPlugin::default())
         .add_systems(Startup, (spawn_camera, spawn_basic_scene))
@@ -14,7 +16,8 @@ fn main() {
         .run();
 }
 
-#[derive(Resource, Deref, Default)]
+#[derive(Reflect, Resource, Deref, Default)]
+#[reflect(Resource)]
 struct Gravity {
     val: f32,
 }
