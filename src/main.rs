@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
@@ -10,7 +11,7 @@ use bevy_inspector_egui::quick::{ResourceInspectorPlugin, WorldInspectorPlugin};
 use bevy_window_title_diagnostics::WindowTitleLoggerDiagnosticsPlugin;
 use rand::prelude::*;
 
-const PARTICLE_SIZE: f32 = 0.1;
+const PARTICLE_SIZE: f32 = 0.05;
 const MASS: f32 = 1.;
 const WINDOW_WIDTH: f32 = 1920.;
 const WINDOW_HEIGHT: f32 = 1080.;
@@ -35,7 +36,7 @@ fn main() {
         .add_systems(Update, (
             // apply_gravity,
             apply_pressure_force,
-            update_density,
+            // update_density,
             update_position,
             resolve_collision,
             draw_gizmos
@@ -67,7 +68,7 @@ impl Default for SimConfig {
             particles_num: 402,
             particles_spacing: 2. * PARTICLE_SIZE + 0.02,
             target_density: 2.75,
-            pressure_multiplier: 0.5,
+            pressure_multiplier: 25.,
         }
     }
 }
@@ -86,7 +87,7 @@ fn spawn_camera(mut commands: Commands) {
         projection: OrthographicProjection {
             far: 1000.,
             near: -1000.,
-            scale: 0.01, 
+            scale: 0.01,
             ..Default::default()
         },
         ..default()
@@ -148,11 +149,33 @@ fn spawn_random_scene(
     }
 }
 
-fn smoothing_kernel(radius: f32, dst: f32) -> f32 {
-    let volume = std::f32::consts::PI * radius.powf(8.) / 4.;
+#[allow(dead_code)]
+fn smoothing_kernel_old(radius: f32, dst: f32) -> f32 {
+    let volume = PI * radius.powf(8.) / 4.;
     let v = (radius - dst).max(0.);
 
     v * v * v / volume
+}
+
+fn smoothing_kernel(radius: f32, dst: f32) -> f32 {
+    if dst >= radius {
+        return 0.;
+    }
+
+    let volume = (PI * radius.powf(4.)) / 6.;
+    (radius - dst) * (radius - dst) / volume
+}
+
+#[allow(dead_code)]
+fn smoothing_kernel_derivative_old(radius: f32, dst: f32) -> f32 {
+    if dst >= radius {
+        return 0.;
+    }
+
+    let f = radius * radius - dst * dst;
+    let scale = -24. / (PI * radius.powf(8.));
+
+    scale * dst * f * f
 }
 
 fn smoothing_kernel_derivative(radius: f32, dst: f32) -> f32 {
@@ -160,10 +183,8 @@ fn smoothing_kernel_derivative(radius: f32, dst: f32) -> f32 {
         return 0.;
     }
 
-    let f = radius * radius - dst * dst;
-    let scale = -24. / (std::f32::consts::PI * radius.powf(8.));
-
-    scale * dst * f * f
+    let scale = 12. / (PI * radius.powf(4.));
+    (dst - radius) * scale
 }
 
 fn convert_density_to_pressure(density: f32, target_density: f32, pressure_multiplier: f32) -> f32 {
@@ -213,7 +234,9 @@ fn calculate_pressure_force(sample_point: Vec2, positions: &[Vec2], densities: &
         let dst = (positions[i] - sample_point).length();
         let dir = if dst <= 0.0001 {
             // todo: change it to random direction
-            Vec2::X
+            let mut rng = thread_rng();
+            let rad = rng.gen_range(0.0..(2. * PI));
+            Vec2::from_angle(rad)
         } else {
             (positions[i] - sample_point) / dst
         };
@@ -255,7 +278,7 @@ fn apply_pressure_force(
             &sim_config,
         );
         let pressure_acceleration = pressure_force / **density;
-        **velocity += pressure_acceleration * time.delta_seconds();
+        **velocity = pressure_acceleration * time.delta_seconds();
     }
 }
 
